@@ -1,0 +1,106 @@
+class Node:
+    def __init__(self):
+        self.name = ""      
+        self.heuristic = 99999  # Estimated cost to goal
+        self.neighbors = []     # List of adjacent node names
+        self.edges = []         # Travel costs to neighbors
+
+    def add_neighbor(self, neighbor, edge_value):
+        self.neighbors.append(neighbor)
+        self.edges.append(edge_value)
+
+def return_index(node_name):
+    #Converts node string ID to array index (e.g., 'A1' -> 0).
+    return int(node_name[1:]) - 1
+
+
+# Search State Initialization
+PathStack = []  # Stack to store (node_name, cumulative_g_cost)
+DeadEnds = []   # Track nodes that lead to dead ends
+NodeArray = [Node() for _ in range(100)]
+index = 0
+
+# Data Ingestion (File I/O)
+try:
+    with open("map.txt", "r") as MapFile:
+        info = MapFile.readline().strip()
+        while info != "":
+            NodeArray[index].name = info
+            NodeArray[index].heuristic = int(MapFile.readline().strip())
+            
+            neighbor_info = MapFile.readline().strip()
+            while neighbor_info != "-":
+                neighbor_name = neighbor_info
+                edge_cost = int(MapFile.readline().strip())
+                NodeArray[index].add_neighbor(neighbor_name, edge_cost)
+                neighbor_info = MapFile.readline().strip()
+            
+            index += 1
+            info = MapFile.readline().strip()
+except FileNotFoundError:
+    print("Error: 'map.txt' not found.")
+
+# Algorithm Execution
+start = input("Enter name of start node (e.g., A1): ").strip()
+end = input("Enter name of end node (e.g., A10): ").strip()
+
+current = start
+g_val = 0
+path_history = [start]
+
+while current != end:
+    # Record current state for potential backtracking
+    PathStack.append((current, g_val))
+    
+    best_total = 99999
+    best_neighbor = ""
+    best_edge = 0
+
+    current_index = return_index(current)
+    
+    # Evaluate neighbors based on f(n) = g(n) + h(n)
+    for i in range(len(NodeArray[current_index].neighbors)):
+        neighbor = NodeArray[current_index].neighbors[i]
+        
+        # Cycle prevention and Dead-End avoidance
+        if neighbor not in [n for (n, _) in PathStack] and neighbor not in DeadEnds:
+            neighbor_index = return_index(neighbor)
+            # A* Metric calculation
+            total_f = g_val + NodeArray[current_index].edges[i] + NodeArray[neighbor_index].heuristic
+           
+            # Greedy selection of the most promising node
+            if total_f < best_total:
+                best_total = total_f
+                best_neighbor = neighbor
+                best_edge = NodeArray[current_index].edges[i]
+            elif total_f == best_total:
+                # Tie-breaker: Choose node closer to goal (lower heuristic)
+                if NodeArray[neighbor_index].heuristic < NodeArray[return_index(best_neighbor)].heuristic:
+                    best_neighbor = neighbor
+                    best_edge = NodeArray[current_index].edges[i]
+
+    if best_neighbor == "":
+        # Backtracking Logic: Triggered when no valid neighbors are found
+        if current == start:
+            print("No viable path found.")
+            break
+        
+        # Revert state to previous node in PathStack
+        popped_node, _ = PathStack.pop()
+        DeadEnds.append(popped_node)
+        
+        # Peek at stack to restore previous position and cost
+        current, g_val = PathStack.pop() 
+        path_history.append(f"BACKTRACK from {popped_node} to {current}")
+        continue 
+
+    # Move to chosen neighbor
+    g_val += best_edge
+    current = best_neighbor
+    path_history.append(current)
+
+# Results
+if current == end:
+    print("\nNavigation Successful")
+    print("Full Traversal History:", path_history)
+    print(f"Final Path Cost (g): {g_val}")
